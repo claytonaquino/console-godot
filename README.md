@@ -69,9 +69,18 @@ No teclado do PC: setas, Enter, Esc, F1 (menu) e F12 (segurar para fechar o jogo
 - Para forçar o driver aberto: menu Start → "Placa NVIDIA antiga" (vale a partir da próxima inicialização). Se a tela ficar preta, aperte **e** no menu de boot, acrescente `console.gpu=nouveau` ao fim da linha `linux` e aperte F10.
 - Em máquinas AMD ou Intel, nada disso importa: o driver Mesa é usado automaticamente.
 
-## 6. Adicionando jogos
+## 6. Loja de jogos
 
-Cada jogo é uma pasta com um `game.json`, o executável Linux exportado pelo Godot (com o *.pck embutido*) e, opcionalmente, um `cover.png` na proporção 340×460:
+Os jogos novos chegam pela **Loja de jogos** (Start → Loja de jogos), sem linha de comando:
+
+- A loja lê o catálogo publicado no ramo **`downloads`** deste repositório (pasta `jogos/`).
+- Cada jogo é baixado, conferido (SHA-256) e instalado em `~/games`, na área de saves do pendrive.
+- Se a mesma versão existir na imagem e na loja, o console usa a mais nova.
+- Ao ligar, o console procura novidades. O botão na loja alterna entre **só avisar**, **instalar sozinho** e **não procurar**.
+
+**Para publicar um jogo:** coloque o projeto Godot em `games/<id>/` com um `game.json` e a versão em `project.godot` (`config/version`). Ao enviar para o `main`, o workflow **"Publicar jogos na Loja"** exporta, empacota e atualiza o catálogo. Para atualizar um jogo, aumente o `config/version`.
+
+Formato do `game.json`:
 
 ```json
 {
@@ -82,9 +91,6 @@ Cada jogo é uma pasta com um `game.json`, o executável Linux exportado pelo Go
   "color": "#e76f51"
 }
 ```
-
-- **Fixos na imagem:** coloque o projeto em `games/` e gere a ISO de novo (o `export-godot.sh` exporta todos).
-- **Sem gerar a ISO de novo:** copie a pasta para `~/games` pelo Terminal do menu Start. Essa pasta fica na área de saves.
 
 ## 7. Problemas
 

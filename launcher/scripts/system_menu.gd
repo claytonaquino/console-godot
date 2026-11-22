@@ -169,7 +169,8 @@ func _page_main() -> void:
 		else:
 			vol_label.text = "n/d")
 
-	var wifi_btn := _button("Wi-Fi", _page_wifi)
+	var store_btn := _button("Loja de jogos", _page_store)
+	_button("Wi-Fi", _page_wifi)
 	_button("Controles Bluetooth", _page_bt)
 	var gpu_btn := Button.new()
 	gpu_btn.text = _gpu_label()
@@ -180,16 +181,13 @@ func _page_main() -> void:
 		gpu_btn.text = _gpu_label()
 		toast.emit("Driver de vídeo muda na próxima inicialização."))
 	_button("Informações do sistema", _page_info)
-	_button("Recarregar biblioteca de jogos", func() -> void:
-		reload_games_requested.emit()
-		close())
 	_button("Terminal (avançado)", func() -> void:
 		close()
 		launch_requested.emit("/usr/bin/xterm", PackedStringArray(["-fa", "Monospace", "-fs", "14", "-maximized"]), "Terminal"))
 	_button("Reiniciar", _confirm.bind("Reiniciar o console?", "reboot"))
 	_button("Desligar", _confirm.bind("Desligar o console?", "off"))
 	_button("Fechar menu", close)
-	wifi_btn.grab_focus.call_deferred()
+	store_btn.grab_focus.call_deferred()
 
 
 func _apply_volume() -> void:
@@ -400,3 +398,130 @@ func _page_info() -> void:
 		for f in Sys.parse_tsv(r.out):
 			if f.size() >= 2:
 				add_row.call(f[0], f[1]))
+
+
+# ---------------------------------------------------------------- loja
+
+var _store_progress: ProgressBar
+var _store_progress_label: Label
+
+
+func _page_store() -> void:
+	var tk := _clear("store", "Loja de jogos")
+	var status := _status("Buscando jogos..." if not Store.fetched else "")
+	var list := _scroll_list()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	_content.add_child(row)
+	_button("Buscar de novo", func() -> void:
+		Store.fetched = false
+		_page_store(), row)
+	var auto_btn := Button.new()
+	auto_btn.text = _auto_label()
+	row.add_child(auto_btn)
+	auto_btn.pressed.connect(func() -> void:
+		# Ciclo: só avisar -> instalar sozinho -> desligado -> só avisar
+		if Store.auto_check and not Store.auto_install:
+			Store.auto_install = true
+		elif Store.auto_check and Store.auto_install:
+			Store.auto_check = false
+			Store.auto_install = false
+		else:
+			Store.auto_check = true
+		Store.save_settings()
+		auto_btn.text = _auto_label())
+	_button("Voltar", _page_main, row)
+	_focus_first.call_deferred()
+
+	var fill := func() -> void:
+		if tk != _token:
+			return
+		for c in list.get_children():
+			list.remove_child(c)
+			c.queue_free()
+		if Store.catalog.is_empty():
+			status.text = Store.last_error if Store.last_error != "" else "Nenhum jogo na loja."
+			return
+		var news := Store.pending().size()
+		status.text = ("%d jogo(s) na loja, %d novidade(s)." % [Store.catalog.size(), news]) if news else ("%d jogo(s) na loja, todos instalados e atualizados." % Store.catalog.size())
+		var inst := Store.installed()
+		for e in Store.catalog:
+			var st := Store.status_of(e)
+			var info := ""
+			match st:
+				"new":
+					info = "baixar  (%s)" % Store.size_mb(e)
+				"update":
+					info = "atualizar  v%s → v%s" % [inst[e.id].version, e.version]
+				_:
+					info = "instalado  v%s" % e.version
+			var entry: Dictionary = e
+			_button("%s      %s" % [e.title, info], func() -> void: _store_item(entry), list)
+		_focus_first.call_deferred()
+
+	if Store.fetched:
+		fill.call()
+	else:
+		Store.fetch(func(_ok: bool) -> void: fill.call())
+
+
+func _auto_label() -> String:
+	if not Store.auto_check:
+		return "Ao ligar: não procurar"
+	return "Ao ligar: instalar sozinho" if Store.auto_install else "Ao ligar: só avisar"
+
+
+func _store_item(entry: Dictionary) -> void:
+	var st := Store.status_of(entry)
+	_clear("store_item", str(entry.title))
+	_status(str(entry.get("description", "")))
+	if st == "installed":
+		_status("Instalado, versão %s." % entry.version)
+		var inst: Dictionary = Store.installed().get(entry.id, {})
+		_button("Reinstalar", _store_install.bind(entry))
+		if inst.get("removable", false):
+			_button("Remover do pendrive", func() -> void:
+				Store.remove(str(entry.id), func(r: Dictionary) -> void:
+					toast.emit("Removido: " + str(entry.title) if r.code == 0 else "Não foi possível remover.")
+					reload_games_requested.emit()
+					_page_store()))
+	else:
+		_status("Versão %s, %s." % [entry.version, Store.size_mb(entry)])
+		_button("Baixar e instalar" if st == "new" else "Atualizar", _store_install.bind(entry))
+	_button("Voltar", _page_store)
+	_focus_first.call_deferred()
+
+
+func _store_install(entry: Dictionary) -> void:
+	var tk := _clear("store_install", str(entry.title))
+	var label := _status("Baixando...")
+	var bar := ProgressBar.new()
+	bar.custom_minimum_size = Vector2(1000, 36)
+	bar.max_value = 1.0
+	bar.show_percentage = false
+	_content.add_child(bar)
+	_store_progress = bar
+	_store_progress_label = label
+	var back := _button("Voltar (o download continua)", _page_store)
+	back.grab_focus.call_deferred()
+	if not Store.install(entry):
+		label.text = "Já existe um download em andamento. Aguarde terminar."
+		return
+	var on_done := func(id: String, ok: bool, message: String) -> void:
+		if tk != _token or id != str(entry.id):
+			return
+		_store_progress = null
+		bar.value = 1.0 if ok else bar.value
+		label.text = "Pronto! O jogo já está na biblioteca." if ok else "Falhou: " + message
+		back.text = "Voltar"
+	Store.install_finished.connect(on_done, CONNECT_ONE_SHOT)
+
+
+func _process(_delta: float) -> void:
+	if _store_progress and is_instance_valid(_store_progress) and Store.busy_id != "":
+		var p := Store.progress()
+		_store_progress.value = p
+		var total := Store.busy_size / 1048576.0
+		_store_progress_label.text = "Baixando... %d%%  (%.0f de %.0f MB)" % [int(p * 100), p * total, total]
+		if p >= 0.999:
+			_store_progress_label.text = "Conferindo e instalando..."

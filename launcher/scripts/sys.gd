@@ -34,10 +34,12 @@ func games_dirs() -> PackedStringArray:
 	var env := OS.get_environment("CONSOLE_GAMES_DIRS")
 	if env != "":
 		return env.split(":", false)
-	var dirs := PackedStringArray(["/opt/console/games"])
+	# Jogos baixados pela Loja (~/games) vêm primeiro; os da imagem depois.
+	var dirs := PackedStringArray()
 	var home := OS.get_environment("HOME")
 	if home != "":
 		dirs.append(home.path_join("games"))
+	dirs.append("/opt/console/games")
 	# Modo desenvolvimento: pasta "games" ao lado do executável.
 	dirs.append(OS.get_executable_path().get_base_dir().path_join("games"))
 	return dirs

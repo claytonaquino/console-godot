@@ -1,0 +1,42 @@
+name: Publicar jogos na Loja
+
+# Exporta os jogos e publica no ramo "downloads" (pasta jogos/):
+# catalog.json + um pacote por jogo. O console lê esse catálogo.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["games/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar-jogos
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exportar jogos (Godot)
+        run: ./scripts/export-godot.sh
+
+      - name: Montar pacotes e catálogo
+        run: |
+          base="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/downloads"
+          ./scripts/publish-games.sh "$RUNNER_TEMP/site" "$base"
+          printf '# Jogos da Loja do Console Godot\n\nGerado automaticamente pelo workflow "Publicar jogos na Loja". Não edite à mão.\n' > "$RUNNER_TEMP/site/README.md"
+
+      - name: Publicar no ramo downloads
+        run: |
+          cd "$RUNNER_TEMP/site"
+          git init -q -b downloads
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Jogos publicados em $(date -u +%Y-%m-%dT%H:%MZ) a partir de ${GITHUB_SHA::7}"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" downloads
+          cat jogos/catalog.json

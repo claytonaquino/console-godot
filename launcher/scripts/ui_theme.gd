@@ -54,6 +54,8 @@ func build() -> Theme:
 	t.set_stylebox("focus", "HSlider", box(Color(0, 0, 0, 0), 10, 3))
 
 	t.set_stylebox("panel", "ScrollContainer", StyleBoxEmpty.new())
+	t.set_stylebox("background", "ProgressBar", box(Color(1, 1, 1, 0.10), 10, 0, ACCENT, 0))
+	t.set_stylebox("fill", "ProgressBar", box(ACCENT, 10, 0, ACCENT, 0))
 	return t
 
 

@@ -56,6 +56,8 @@ func _ready() -> void:
 	st.autostart = true
 	st.timeout.connect(_refresh_status)
 	add_child(st)
+	Store.install_finished.connect(_on_store_installed)
+	get_tree().create_timer(3.0).timeout.connect(_auto_store_check)
 	if OS.get_environment("CONSOLE_SELFTEST") != "":
 		_selftest.call_deferred(OS.get_environment("CONSOLE_SELFTEST"))
 
@@ -165,9 +167,11 @@ func _build_ui() -> void:
 	ov_box.add_child(_overlay_hint)
 	_overlay.add_child(ov_box)
 	_overlay.hide()
+	_overlay.z_index = 10
 	add_child(_overlay)
 
 	_menu = SystemMenu.new()
+	_menu.z_index = 5
 	add_child(_menu)
 	_menu.closed.connect(_on_menu_closed)
 	_menu.launch_requested.connect(_launch_path)
@@ -183,6 +187,7 @@ func _build_ui() -> void:
 	var tsb := UiTheme.box(Color(0.1, 0.13, 0.2, 0.95), 22, 2, Color(1, 1, 1, 0.15))
 	_toast.add_theme_stylebox_override("normal", tsb)
 	_toast.modulate.a = 0.0
+	_toast.z_index = 20
 	add_child(_toast)
 
 
@@ -220,6 +225,39 @@ func _on_joy_changed(device: int, connected: bool) -> void:
 	_refresh_status()
 
 
+# ---------------------------------------------------------------- loja
+
+func _auto_store_check() -> void:
+	if not Store.auto_check or not Sys.is_console:
+		return
+	Store.fetch(func(ok: bool) -> void:
+		if not ok:
+			return
+		var todo := Store.pending()
+		if todo.is_empty():
+			return
+		if Store.auto_install:
+			show_toast("Loja: baixando %d jogo(s) novo(s) ou atualizado(s)..." % todo.size())
+			Store.install_all(todo)
+		else:
+			show_toast("Loja: %d novidade(s). Start → Loja de jogos" % todo.size()))
+
+
+func _on_store_installed(id: String, ok: bool, message: String) -> void:
+	if ok:
+		_load_games()
+		show_toast("Jogo instalado: " + _title_for(id))
+	else:
+		show_toast("Falha ao instalar %s: %s" % [_title_for(id), message])
+
+
+func _title_for(id: String) -> String:
+	for e in Store.catalog:
+		if str(e.get("id", "")) == id:
+			return str(e.get("title", id))
+	return id
+
+
 # ---------------------------------------------------------------- biblioteca
 
 func _load_games() -> void:
@@ -230,6 +268,8 @@ func _load_games() -> void:
 		if da == null:
 			continue
 		for sub in da.get_directories():
+			if sub.begins_with("."):
+				continue
 			var gdir := dir_path.path_join(sub)
 			var manifest := gdir.path_join("game.json")
 			if not FileAccess.file_exists(manifest):
@@ -239,11 +279,15 @@ func _load_games() -> void:
 				push_warning("game.json inválido: " + manifest)
 				continue
 			var id := str(data.get("id", sub))
-			if seen.has(id):
-				continue
-			seen[id] = true
 			data["id"] = id
 			data["dir"] = gdir
+			if seen.has(id):
+				# Mesmo jogo em dois lugares: fica a versão mais nova.
+				var old: Dictionary = games[seen[id]]
+				if Store.version_cmp(str(data.get("version", "0")), str(old.get("version", "0"))) > 0:
+					games[seen[id]] = data
+				continue
+			seen[id] = games.size()
 			games.append(data)
 	games.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return str(a.get("title", "")).naturalnocasecmp_to(str(b.get("title", ""))) < 0)
@@ -257,7 +301,7 @@ func _rebuild_cards() -> void:
 	cards.clear()
 	_empty.visible = games.is_empty()
 	if games.is_empty():
-		_empty.text = "Nenhum jogo encontrado.\nCopie jogos (pasta com game.json) para:\n" + "\n".join(Sys.games_dirs())
+		_empty.text = "Nenhum jogo instalado.\nAperte Start e escolha \"Loja de jogos\" para baixar."
 		_title.text = ""
 		_desc.text = "Aperte Start para abrir o menu do sistema."
 		return
@@ -268,6 +312,9 @@ func _rebuild_cards() -> void:
 		card.pressed.connect(_launch.bind(g))
 		_row.add_child(card)
 		cards.append(card)
+	if _menu.visible or running_pid > 0:
+		_set_cards_focus(false if _menu.visible else true)
+		return
 	var last := str(_settings.get_value("launcher", "last_game", ""))
 	var target: Button = cards[0]
 	for c in cards:
@@ -441,6 +488,24 @@ func _selftest(dir: String) -> void:
 	_menu._page_info()
 	await get_tree().create_timer(1.0).timeout
 	await _shot(dir, "08_info")
+	_menu._page_store()
+	await get_tree().create_timer(2.0).timeout
+	await _shot(dir, "08a_loja")
+	for e in Store.catalog:
+		if Store.status_of(e) != "installed":
+			_menu._store_item(e)
+			await _shot(dir, "08b_item")
+			_menu._store_install(e)
+			for i in 60:
+				await get_tree().create_timer(0.5).timeout
+				if Store.busy_id == "":
+					break
+			await _shot(dir, "08c_instalado")
+			print("SELFTEST store_installed=", Store.status_of(e))
+			break
+	_menu._page_store()
+	await get_tree().create_timer(1.0).timeout
+	await _shot(dir, "08d_loja_depois")
 	_menu.close()
 	await get_tree().process_frame
 	_launch(games[0])

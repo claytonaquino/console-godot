@@ -43,7 +43,15 @@ for game in "$ROOT"/games/*/; do
     id=$(basename "$game")
     exe=$(sed -n 's/.*"exec" *: *"\([^"]*\)".*/\1/p' "$game/game.json")
     export_project "$game" "$ROOT/build/games/$id/${exe:-$id.x86_64}"
-    cp "$game/game.json" "$ROOT/build/games/$id/"
+    # game.json vai com a versão do project.godot (config/version), usada pela Loja.
+    version=$(sed -n 's/^config\/version="\(.*\)"/\1/p' "$game/project.godot")
+    python3 - "$game/game.json" "$ROOT/build/games/$id/game.json" "${version:-0.0.0}" <<'PY'
+import json, sys
+src, dst, version = sys.argv[1:4]
+data = json.load(open(src, encoding="utf-8"))
+data["version"] = version
+json.dump(data, open(dst, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+PY
     [ -f "$game/cover.png" ] && cp "$game/cover.png" "$ROOT/build/games/$id/"
 done
 echo ">> Pronto: $ROOT/build"

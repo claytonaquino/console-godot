@@ -1,0 +1,63 @@
+#!/bin/bash
+# Loja de jogos do console.
+#   catalog                       -> imprime o catálogo (JSON)
+#   install ID URL SHA256         -> baixa, confere e instala em ~/games/ID
+#   remove ID                     -> remove ~/games/ID
+# O download parcial fica em ~/games/.download/ID.tar.gz (o launcher lê o
+# tamanho desse arquivo para mostrar o progresso).
+set -u
+GAMES="${CONSOLE_USER_GAMES:-$HOME/games}"
+TMP="$GAMES/.download"
+URL_FILE="${CONSOLE_STORE_URL_FILE:-/opt/console/store-url}"
+CATALOG_URL="${CONSOLE_STORE_URL:-$(head -n1 "$URL_FILE" 2>/dev/null)}"
+
+valid_id() { [[ "$1" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; }
+
+case "${1:-}" in
+catalog)
+    [ -n "$CATALOG_URL" ] || { echo "Endereço da loja não configurado."; exit 1; }
+    # O parâmetro evita receber um catálogo antigo guardado em cache.
+    sep='?'; case "$CATALOG_URL" in *\?*) sep='&' ;; esac
+    out=$(curl -fsSL --max-time 20 "$CATALOG_URL${sep}t=$(date +%s)" 2>&1) || { echo "Sem conexão com a loja."; exit 1; }
+    echo "$out"
+    ;;
+install)
+    id=${2:?id}; url=${3:?url}; sha=${4:?sha256}
+    valid_id "$id" || { echo "Nome de jogo inválido."; exit 2; }
+    mkdir -p "$TMP"
+    pkg="$TMP/$id.tar.gz"
+    rm -f "$pkg"
+    if ! curl -fsSL --retry 2 --max-time 1800 -o "$pkg" "$url"; then
+        rm -f "$pkg"; echo "Falha no download."; exit 1
+    fi
+    got=$(sha256sum "$pkg" | cut -d' ' -f1)
+    if [ "$got" != "$sha" ]; then
+        rm -f "$pkg"; echo "Arquivo corrompido (verificação falhou)."; exit 1
+    fi
+    work="$TMP/$id.new"
+    rm -rf "$work"; mkdir -p "$work"
+    if ! tar xzf "$pkg" -C "$work" --no-same-owner; then
+        rm -rf "$work" "$pkg"; echo "Pacote inválido."; exit 1
+    fi
+    if [ ! -f "$work/$id/game.json" ]; then
+        rm -rf "$work" "$pkg"; echo "Pacote sem game.json."; exit 1
+    fi
+    chmod +x "$work/$id"/*.x86_64 2>/dev/null
+    rm -rf "$GAMES/$id.old"
+    [ -d "$GAMES/$id" ] && mv "$GAMES/$id" "$GAMES/$id.old"
+    mv "$work/$id" "$GAMES/$id"
+    rm -rf "$GAMES/$id.old" "$work" "$pkg"
+    echo "Instalado"
+    ;;
+remove)
+    id=${2:?id}
+    valid_id "$id" || { echo "Nome de jogo inválido."; exit 2; }
+    [ -d "$GAMES/$id" ] || { echo "Jogo não está instalado na área de saves."; exit 1; }
+    rm -rf "${GAMES:?}/$id"
+    echo "Removido"
+    ;;
+*)
+    echo "uso: console-store catalog | install ID URL SHA256 | remove ID" >&2
+    exit 2
+    ;;
+esac
