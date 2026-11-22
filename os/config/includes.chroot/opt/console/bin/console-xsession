@@ -3,6 +3,18 @@
 # Se o launcher fechar ou travar, ele é aberto de novo.
 xset s off -dpms s noblank 2>/dev/null
 xsetroot -solid black 2>/dev/null
+
+# Console usa uma tela só: mantém a primeira saída conectada e desliga as
+# outras (com dois cabos ligados, a imagem virava uma tela de 3840 de largura).
+outputs=$(xrandr 2>/dev/null | awk '/ connected/{print $1}')
+first=$(echo "$outputs" | head -n1)
+for o in $outputs; do
+    if [ "$o" = "$first" ]; then
+        xrandr --output "$o" --auto --primary --pos 0x0 2>/dev/null
+    else
+        xrandr --output "$o" --off 2>/dev/null
+    fi
+done
 matchbox-window-manager -use_titlebar no -use_cursor no &
 
 LAUNCHER=/opt/console/launcher/console-launcher.x86_64

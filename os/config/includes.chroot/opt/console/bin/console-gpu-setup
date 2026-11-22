@@ -6,6 +6,27 @@
 # ou o parâmetro de boot console.gpu=nouveau|nvidia.
 STATE=/run/console-gpu
 PREF_FILE=/home/console/.config/console/gpu
+XCONF=/etc/X11/xorg.conf.d/20-console-nvidia.conf
+
+# Diz ao Xorg para usar o driver "nvidia" (sem isso ele escolhe nouveau,
+# modesetting ou fbdev e o 3D cai no processador).
+write_nvidia_xconf() {
+    mkdir -p /etc/X11/xorg.conf.d
+    cat > "$XCONF" <<'XEOF'
+Section "Files"
+    ModulePath "/usr/lib/nvidia/nvidia"
+    ModulePath "/usr/lib/nvidia"
+    ModulePath "/usr/lib/xorg/modules"
+EndSection
+
+Section "Device"
+    Identifier "NVIDIA"
+    Driver     "nvidia"
+    Option     "NoLogo" "true"
+EndSection
+XEOF
+}
+rm -f "$XCONF"
 
 rfkill unblock wifi 2>/dev/null
 rfkill unblock bluetooth 2>/dev/null
@@ -27,6 +48,7 @@ fi
 if [ "$pref" != "nouveau" ]; then
     for m in nvidia-drm nvidia-tesla-470-drm; do
         if modprobe "$m" modeset=1 2>/dev/null; then
+            write_nvidia_xconf
             echo nvidia-470 > "$STATE"
             echo "console-gpu: usando driver NVIDIA 470"
             exit 0
