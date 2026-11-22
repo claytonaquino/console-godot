@@ -1,7 +1,7 @@
 {
   "id": "simulador-carro",
   "title": "Simulador de Carro",
-  "description": "Física própria de pneus, suspensão, motor e câmbio. Gatilhos aceleram e freiam, LB/RB trocam marcha, Y muda a câmera e o direcional para cima mostra a telemetria.",
+  "description": "Física própria de pneus, suspensão, motor e câmbio. Pista com brita, barreiras, arquibancadas e relevo. Gatilhos aceleram e freiam, LB/RB trocam marcha, Y muda a câmera e o direcional para cima mostra a telemetria.",
   "exec": "simulador-carro.x86_64",
   "color": "#e76f51"
 }

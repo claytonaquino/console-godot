@@ -11,8 +11,14 @@ const SPACING := 2.0
 const CELL := 1.0
 const MU_ASPHALT := 1.0
 const MU_KERB := 0.9
-const MU_GRASS := 0.55
-const ROLL_GRASS := 5.0
+const MU_GRASS := 0.72
+const ROLL_GRASS := 3.5
+const MU_GRAVEL := 0.45
+const ROLL_GRAVEL := 14.0
+## Brita: do fim da zebra até esta distância do centro, por fora das curvas fortes.
+const GRAVEL_OUT := 15.0
+## Curvatura (1/m) a partir da qual a curva ganha caixa de brita.
+const GRAVEL_CURV := 1.0 / 75.0
 
 ## Pontos de controle (x, z) em metros.
 const CONTROL := [
@@ -35,18 +41,18 @@ var _grid_h := 0
 var _grid_dist := PackedFloat32Array()
 var _grid_idx := PackedInt32Array()
 var _kerb := PackedByteArray()
+var _grid_side := PackedByteArray()   # 1 = lado direito da pista
+var gravel := PackedByteArray()        # 1 = trecho com brita por fora
 
 
-func build(tree_count := 700) -> void:
+func build() -> void:
 	_sample_spline()
 	_compute_curvature()
 	_build_grid()
 	_build_speed_profile()
-	_build_ground()
+	_build_physics_floor()
 	_build_road()
 	_build_start_line()
-	_build_trees(tree_count)
-	_build_scenery()
 
 
 # ---------------------------------------------------------------- geometria
@@ -126,6 +132,8 @@ func _build_grid() -> void:
 	_grid_dist.fill(1e9)
 	_grid_idx.resize(_grid_w * _grid_h)
 	_grid_idx.fill(-1)
+	_grid_side.resize(_grid_w * _grid_h)
+	_grid_side.fill(0)
 	var r := int(ceil(16.0 / CELL))
 	for i in points.size():
 		var p := points[i]
@@ -146,19 +154,34 @@ func _build_grid() -> void:
 				if d < _grid_dist[k]:
 					_grid_dist[k] = d
 					_grid_idx[k] = i
+					_grid_side[k] = 1 if (wx - p.x) * rights[i].x + (wz - p.z) * rights[i].z > 0.0 else 0
 	_kerb.resize(points.size())
+	gravel.resize(points.size())
 	for i in points.size():
 		_kerb[i] = 1 if absf(curvature[i]) > 1.0 / 140.0 else 0
+	# Brita por fora das curvas fortes (com um pouco de folga antes e depois).
+	var n := points.size()
+	for i in n:
+		gravel[i] = 0
+	for i in n:
+		if absf(curvature[i]) > GRAVEL_CURV:
+			for k in range(-10, 16):
+				gravel[(i + k + n) % n] = 1
 
 
-## Retorna {dist, idx} do ponto da pista mais próximo (dist grande = longe).
+## Retorna {dist, idx, right} do ponto da pista mais próximo (dist grande = longe).
 func lookup(pos: Vector3) -> Dictionary:
 	var x := int((pos.x - _grid_origin.x) / CELL)
 	var z := int((pos.z - _grid_origin.y) / CELL)
 	if x < 0 or z < 0 or x >= _grid_w or z >= _grid_h:
-		return {"dist": 1e9, "idx": -1}
+		return {"dist": 1e9, "idx": -1, "right": false}
 	var k := z * _grid_w + x
-	return {"dist": _grid_dist[k], "idx": _grid_idx[k]}
+	return {"dist": _grid_dist[k], "idx": _grid_idx[k], "right": _grid_side[k] == 1}
+
+
+## Lado de fora da curva no índice i: true = direita.
+func outside_is_right(i: int) -> bool:
+	return curvature[i] > 0.0
 
 
 ## Aderência (μ) e fator de resistência ao rolamento numa posição.
@@ -167,8 +190,13 @@ func surface_at(pos: Vector3) -> Vector2:
 	var d: float = l.dist
 	if d <= HALF_WIDTH:
 		return Vector2(MU_ASPHALT, 1.0)
-	if d <= HALF_WIDTH + KERB_WIDTH and l.idx >= 0 and _kerb[l.idx] == 1:
+	if l.idx < 0:
+		return Vector2(MU_GRASS, ROLL_GRASS)
+	var i: int = l.idx
+	if d <= HALF_WIDTH + KERB_WIDTH and _kerb[i] == 1:
 		return Vector2(MU_KERB, 1.5)
+	if d <= GRAVEL_OUT and gravel[i] == 1 and l.right == outside_is_right(i):
+		return Vector2(MU_GRAVEL, ROLL_GRAVEL)
 	return Vector2(MU_GRASS, ROLL_GRASS)
 
 
@@ -207,23 +235,14 @@ func _noise_tex(base: Color, variation: float, freq: float) -> NoiseTexture2D:
 	return tex
 
 
-func _build_ground() -> void:
+func _build_physics_floor() -> void:
+	# Chão infinito de segurança (o relevo do cenário tem colisão própria).
 	var body := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
 	shape.shape = WorldBoundaryShape3D.new()
 	body.add_child(shape)
+	body.position.y = -0.05
 	add_child(body)
-
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(3000, 3000)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = _noise_tex(Color(0.22, 0.38, 0.14), 0.14, 0.02)
-	mat.uv1_scale = Vector3(300, 300, 1)
-	mat.roughness = 0.95
-	plane.material = mat
-	var mi := MeshInstance3D.new()
-	mi.mesh = plane
-	add_child(mi)
 
 
 func _ribbon(offset_a: float, offset_b: float, y: float, color_fn: Callable, mat: Material, only := Callable()) -> void:
@@ -264,19 +283,43 @@ func _build_road() -> void:
 	asphalt.vertex_color_use_as_albedo = true
 	asphalt.roughness = 0.95
 	asphalt.metallic_specular = 0.15
-	_ribbon(-HALF_WIDTH, HALF_WIDTH, 0.02, func(_i: int) -> Color: return Color.WHITE, asphalt)
+	_ribbon(-HALF_WIDTH, HALF_WIDTH, 0.03, func(_i: int) -> Color: return Color.WHITE, asphalt)
 
 	var plain := StandardMaterial3D.new()
 	plain.vertex_color_use_as_albedo = true
 	plain.roughness = 0.7
 	var white := func(_i: int) -> Color: return Color(0.92, 0.92, 0.92)
-	_ribbon(-HALF_WIDTH + 0.3, -HALF_WIDTH + 0.5, 0.03, white, plain)
-	_ribbon(HALF_WIDTH - 0.5, HALF_WIDTH - 0.3, 0.03, white, plain)
+	_ribbon(-HALF_WIDTH + 0.3, -HALF_WIDTH + 0.5, 0.045, white, plain)
+	_ribbon(HALF_WIDTH - 0.5, HALF_WIDTH - 0.3, 0.045, white, plain)
 
 	var kerb_color := func(i: int) -> Color: return Color(0.85, 0.1, 0.1) if (i / 2) % 2 == 0 else Color(0.95, 0.95, 0.95)
 	var is_kerb := func(i: int) -> bool: return _kerb[i] == 1
-	_ribbon(-HALF_WIDTH - KERB_WIDTH, -HALF_WIDTH, 0.04, kerb_color, plain, is_kerb)
-	_ribbon(HALF_WIDTH, HALF_WIDTH + KERB_WIDTH, 0.04, kerb_color, plain, is_kerb)
+	_ribbon(-HALF_WIDTH - KERB_WIDTH, -HALF_WIDTH, 0.05, kerb_color, plain, is_kerb)
+	_ribbon(HALF_WIDTH, HALF_WIDTH + KERB_WIDTH, 0.05, kerb_color, plain, is_kerb)
+
+	# Caixas de brita (por fora das curvas fortes)
+	var sand := StandardMaterial3D.new()
+	sand.albedo_texture = _noise_tex(Color(0.72, 0.64, 0.48), 0.12, 0.5)
+	sand.uv1_scale = Vector3(4, 2, 1)
+	sand.roughness = 1.0
+	var sand_c := func(_i: int) -> Color: return Color.WHITE
+	_ribbon(HALF_WIDTH + KERB_WIDTH, GRAVEL_OUT, 0.025, sand_c, sand, func(i: int) -> bool: return gravel[i] == 1 and outside_is_right(i))
+	_ribbon(-GRAVEL_OUT, -HALF_WIDTH - KERB_WIDTH, 0.025, sand_c, sand, func(i: int) -> bool: return gravel[i] == 1 and not outside_is_right(i))
+
+	# Grid de largada pintado (posições alternadas antes da linha)
+	var n := points.size()
+	for slot in 8:
+		var i := (n - 6 - slot * 5) % n
+		var side := -2.6 if slot % 2 == 0 else 2.6
+		var mark := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(2.4, 0.25)
+		pm.material = plain
+		mark.mesh = pm
+		mark.position = points[i] + rights[i] * side + Vector3(0, 0.05, 0)
+		mark.basis = Basis.looking_at(tangents[i], Vector3.UP)
+		mark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mark)
 
 
 func _build_start_line() -> void:
@@ -293,82 +336,6 @@ func _build_start_line() -> void:
 	plane.material = mat
 	var mi := MeshInstance3D.new()
 	mi.mesh = plane
-	mi.position = points[0] + Vector3(0, 0.05, 0)
+	mi.position = points[0] + Vector3(0, 0.055, 0)
 	mi.basis = Basis.looking_at(rights[0], Vector3.UP)
 	add_child(mi)
-
-
-func _build_trees(count: int) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var xforms: Array[Transform3D] = []
-	var tries := 0
-	while xforms.size() < count and tries < count * 30:
-		tries += 1
-		var p := Vector3(rng.randf_range(_grid_origin.x - 150, _grid_origin.x + _grid_w * CELL + 150), 0,
-			rng.randf_range(_grid_origin.y - 150, _grid_origin.y + _grid_h * CELL + 150))
-		if lookup(p).dist < 1e8:
-			continue
-		var s := rng.randf_range(0.8, 1.6)
-		xforms.append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.3), s)), p))
-	var trunk := CylinderMesh.new()
-	trunk.top_radius = 0.15
-	trunk.bottom_radius = 0.25
-	trunk.height = 3.0
-	trunk.radial_segments = 6
-	var tm := StandardMaterial3D.new()
-	tm.albedo_color = Color(0.36, 0.25, 0.16)
-	trunk.material = tm
-	var top := CylinderMesh.new()
-	top.top_radius = 0.0
-	top.bottom_radius = 1.9
-	top.height = 5.5
-	top.radial_segments = 7
-	var lm := StandardMaterial3D.new()
-	lm.albedo_color = Color(0.16, 0.36, 0.17)
-	top.material = lm
-	for pair in [[trunk, 1.5], [top, 5.2]]:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = pair[0]
-		mm.instance_count = xforms.size()
-		for i in xforms.size():
-			var t := xforms[i]
-			mm.set_instance_transform(i, Transform3D(t.basis, t.origin + t.basis * Vector3(0, pair[1], 0)))
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		add_child(mmi)
-
-
-func _build_scenery() -> void:
-	# Arquibancada e boxes perto da largada (só visual).
-	var base := points[0] - rights[0] * (HALF_WIDTH + 14.0)
-	var stand := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(60, 6, 10)
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.55, 0.57, 0.6)
-	bm.material = m
-	stand.mesh = bm
-	stand.position = base + Vector3(30, 3, 0) - rights[0] * 5.0
-	add_child(stand)
-	var roof := MeshInstance3D.new()
-	var rm := BoxMesh.new()
-	rm.size = Vector3(62, 0.4, 13)
-	var rmat := StandardMaterial3D.new()
-	rmat.albedo_color = Color(0.15, 0.3, 0.55)
-	rm.material = rmat
-	roof.mesh = rm
-	roof.position = stand.position + Vector3(0, 6.5, 0)
-	add_child(roof)
-	var pit := points[0] + rights[0] * (HALF_WIDTH + 18.0)
-	for k in 6:
-		var box := MeshInstance3D.new()
-		var b := BoxMesh.new()
-		b.size = Vector3(9, 4, 8)
-		var bmat := StandardMaterial3D.new()
-		bmat.albedo_color = Color(0.85, 0.85, 0.88) if k % 2 == 0 else Color(0.8, 0.3, 0.2)
-		b.material = bmat
-		box.mesh = b
-		box.position = pit + Vector3(-10 + k * 9.5, 2, 6)
-		add_child(box)

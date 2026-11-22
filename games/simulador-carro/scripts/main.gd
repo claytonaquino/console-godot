@@ -9,13 +9,14 @@ extends Node3D
 ## Teclado:  W/S ou setas, A/D, Espaço, E/Q, C, R, T, M, P, G, Esc.
 
 const QUALITY := [
-	{"name": "Baixa", "shadows": false, "scale": 0.7, "msaa": Viewport.MSAA_DISABLED, "trees": 250},
-	{"name": "Média", "shadows": true, "scale": 1.0, "msaa": Viewport.MSAA_DISABLED, "trees": 600},
-	{"name": "Alta", "shadows": true, "scale": 1.0, "msaa": Viewport.MSAA_2X, "trees": 1000},
+	{"name": "Baixa", "shadows": false, "scale": 0.7, "msaa": Viewport.MSAA_DISABLED, "trees": 0.35},
+	{"name": "Média", "shadows": true, "scale": 1.0, "msaa": Viewport.MSAA_DISABLED, "trees": 0.75},
+	{"name": "Alta", "shadows": true, "scale": 1.0, "msaa": Viewport.MSAA_2X, "trees": 1.0},
 ]
 const CAMERAS := ["Perseguição", "Capô", "Cockpit", "TV"]
 
 var track: Track
+var scenery: Scenery
 var car: Car
 var hud: Hud
 var cam: Camera3D
@@ -41,7 +42,11 @@ func _ready() -> void:
 	_make_environment()
 	track = Track.new()
 	add_child(track)
-	track.build(1000 if _test_mode == "" else 300)
+	track.build()
+	scenery = Scenery.new()
+	add_child(scenery)
+	if _test_mode != "physics":
+		scenery.build(track)
 
 	car = Car.new()
 	add_child(car)
@@ -50,7 +55,8 @@ func _ready() -> void:
 
 	cam = Camera3D.new()
 	cam.fov = 70.0
-	cam.far = 1500.0
+	cam.near = 0.15
+	cam.far = 2200.0
 	add_child(cam)
 	cam.current = true
 	_cam_pos = car.global_position + Vector3(0, 3, 8)
@@ -105,7 +111,7 @@ func _make_environment() -> void:
 	env.ambient_light_energy = 0.45
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
-	env.fog_density = 0.0006
+	env.fog_density = 0.00035
 	env.fog_light_color = Color(0.75, 0.82, 0.9)
 	env.glow_enabled = true
 	env.glow_intensity = 0.1
@@ -127,10 +133,8 @@ func _apply_quality() -> void:
 	sun.shadow_enabled = q.shadows
 	get_viewport().scaling_3d_scale = q.scale
 	get_viewport().msaa_3d = q.msaa
-	for c in track.get_children():
-		if c is MultiMeshInstance3D:
-			var mm := (c as MultiMeshInstance3D).multimesh
-			mm.visible_instance_count = mini(q.trees, mm.instance_count)
+	for mm in scenery.tree_mms:
+		mm.visible_instance_count = int(mm.instance_count * float(q.trees))
 
 
 # ---------------------------------------------------------------- loop

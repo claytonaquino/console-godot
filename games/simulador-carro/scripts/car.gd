@@ -380,11 +380,41 @@ func _box(size: Vector3, pos: Vector3, mat: Material, parent: Node3D) -> MeshIns
 	return mi
 
 
+## Extruda um perfil (z, y) com meia-largura w, centrado em x = 0.
+func _extrude(poly: Array, w: float, mat: Material) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var p2 := PackedVector2Array(poly)
+	var tris := Geometry2D.triangulate_polygon(p2)
+	for side in [-1.0, 1.0]:
+		var order := range(tris.size()) if side > 0 else range(tris.size() - 1, -1, -1)
+		for k in order:
+			var v: Vector2 = p2[tris[k]]
+			st.add_vertex(Vector3(w * side, v.y, v.x))
+	for i in p2.size():
+		var a: Vector2 = p2[i]
+		var b: Vector2 = p2[(i + 1) % p2.size()]
+		var qa := Vector3(-w, a.y, a.x)
+		var qb := Vector3(-w, b.y, b.x)
+		var ra := Vector3(w, a.y, a.x)
+		var rb := Vector3(w, b.y, b.x)
+		for v in [qa, qb, ra, ra, qb, rb]:
+			st.add_vertex(v)
+	st.generate_normals()
+	st.set_material(mat)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	_visual_root.add_child(mi)
+	return mi
+
+
 func _build_visual() -> void:
 	_visual_root = Node3D.new()
 	add_child(_visual_root)
 	var paint := _mat(Color(0.85, 0.22, 0.12), 0.35, 0.3)
+	paint.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var glass := _mat(Color(0.08, 0.1, 0.14), 0.1, 0.6)
+	glass.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var dark := _mat(Color(0.06, 0.06, 0.06), 0.8)
 	var light_f := _mat(Color(1, 0.97, 0.85))
 	light_f.emission_enabled = true
@@ -393,10 +423,15 @@ func _build_visual() -> void:
 	light_r.emission_enabled = true
 	light_r.emission = Color(0.6, 0.0, 0.0)
 
-	_box(Vector3(1.74, 0.42, 4.15), Vector3(0, 0.02, 0), paint, _visual_root)       # carroceria
+	# Carroceria: perfil lateral extrudado (capô inclinado, traseira mais alta).
+	_extrude([Vector2(-2.08, -0.22), Vector2(2.08, -0.22), Vector2(2.08, 0.14), Vector2(1.96, 0.36),
+		Vector2(-1.85, 0.30), Vector2(-2.08, 0.12)], 0.88, paint)
 	# Cabine e teto ficam na camada 2, escondida na câmera de cockpit.
-	_box(Vector3(1.50, 0.40, 2.10), Vector3(0, 0.43, 0.25), glass, _visual_root).layers = 2
-	_box(Vector3(1.40, 0.06, 1.90), Vector3(0, 0.65, 0.28), paint, _visual_root).layers = 2
+	_extrude([Vector2(-0.62, 0.30), Vector2(1.70, 0.35), Vector2(1.22, 0.72), Vector2(0.06, 0.74)], 0.74, glass).layers = 2
+	_box(Vector3(1.42, 0.05, 1.12), Vector3(0, 0.75, 0.64), paint, _visual_root).layers = 2
+	# Para-lamas escuros sobre as rodas
+	for m in [Vector3(-0.80, 0.05, -1.30), Vector3(0.80, 0.05, -1.30), Vector3(-0.81, 0.05, 1.30), Vector3(0.81, 0.05, 1.30)]:
+		_box(Vector3(0.18, 0.12, 0.86), m + Vector3(0, 0.08, 0), dark, _visual_root)
 	_box(Vector3(1.40, 0.10, 0.25), Vector3(0, 0.27, -0.78), dark, _visual_root)     # painel
 	_box(Vector3(1.78, 0.14, 0.25), Vector3(0, -0.12, -2.05), dark, _visual_root)   # para-choque
 	_box(Vector3(1.78, 0.14, 0.25), Vector3(0, -0.12, 2.05), dark, _visual_root)
