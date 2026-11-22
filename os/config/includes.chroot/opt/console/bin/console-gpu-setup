@@ -46,6 +46,12 @@ if ! lspci -nd 10de: 2>/dev/null | grep -qE ' 03(00|02):'; then
 fi
 
 if [ "$pref" != "nouveau" ]; then
+    # Já carregado (ex.: script rodado de novo com o sistema ligado)
+    if [ -d /sys/module/nvidia_drm ]; then
+        write_nvidia_xconf
+        echo nvidia-470 > "$STATE"
+        exit 0
+    fi
     for m in nvidia-drm nvidia-tesla-470-drm; do
         if modprobe "$m" modeset=1 2>/dev/null; then
             write_nvidia_xconf
