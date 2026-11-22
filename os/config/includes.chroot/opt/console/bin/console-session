@@ -1,5 +1,25 @@
 #!/bin/sh
 # Inicia o servidor gráfico só com o launcher (sem área de trabalho).
+# Se a parte gráfica falhar, mostra o erro e deixa um terminal aberto,
+# em vez de ficar tentando de novo com a tela preta.
 mkdir -p "$HOME/games" "$HOME/.config/console"
-exec startx /opt/console/bin/console-xsession -- :0 vt1 -keeptty -nolisten tcp -nocursor \
-    >"$HOME/.config/console/xorg-session.log" 2>&1
+LOG="$HOME/.config/console/xorg-session.log"
+
+start=$(date +%s)
+startx /opt/console/bin/console-xsession -- :0 vt1 -keeptty -nolisten tcp -nocursor >"$LOG" 2>&1
+elapsed=$(( $(date +%s) - start ))
+
+if [ "$elapsed" -lt 15 ]; then
+    clear
+    echo "A parte gráfica do console não abriu."
+    echo "Driver de vídeo: $(cat /run/console-gpu 2>/dev/null || echo '?')"
+    echo
+    echo "Últimas linhas do registro ($LOG):"
+    tail -n 15 "$LOG"
+    [ -f /var/log/Xorg.0.log ] && { echo; echo "Erros do Xorg:"; grep -E '\(EE\)' /var/log/Xorg.0.log | tail -n 8; }
+    echo
+    echo "Tire uma foto desta tela. Para tentar de novo: console-session"
+    echo "Para desligar: sudo poweroff"
+    export PATH="$PATH:/opt/console/bin"
+    exec bash -l --norc
+fi

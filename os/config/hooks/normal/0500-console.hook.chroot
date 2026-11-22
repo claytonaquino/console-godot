@@ -3,6 +3,18 @@
 set -e
 
 chmod 755 /opt/console/bin/*
+
+# Usuário do console criado aqui mesmo (o live-config só cria o usuário se o
+# pacote user-setup estiver instalado; sem ele o login automático falhava).
+if ! id console >/dev/null 2>&1; then
+	useradd -m -s /bin/bash -c "Console" console
+fi
+echo "console:live" | chpasswd
+for g in audio video input render plugdev netdev bluetooth sudo; do
+	getent group "$g" >/dev/null && usermod -aG "$g" console || true
+done
+echo "console ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/console
+chmod 440 /etc/sudoers.d/console
 find /opt/console/launcher /opt/console/games -name '*.x86_64' -exec chmod 755 {} + 2>/dev/null || true
 
 systemctl enable console-gpu.service console-persistence.service
