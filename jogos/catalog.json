@@ -1,0 +1,35 @@
+{
+  "updated": "2026-11-22T11:58:49Z",
+  "games": [
+    {
+      "id": "ilha-teste",
+      "title": "Ilha de Teste",
+      "description": "Explore uma ilha 3D gerada por algoritmo. Mostra o FPS na tela para medir a placa de vídeo. Y muda a qualidade, X muda a hora do dia.",
+      "color": "#2a9d8f",
+      "version": "0.1.0",
+      "url": "https://raw.githubusercontent.com/claytonaquino/console-godot/downloads/jogos/ilha-teste-0.1.0.tar.gz",
+      "sha256": "c122c094a7ffedf8285a2b13f2612b38dd88d914d46795102dd4a2be19a8ea6d",
+      "size": 28558882
+    },
+    {
+      "id": "simulador-carro",
+      "title": "Simulador de Carro",
+      "description": "Física própria de pneus, suspensão, motor e câmbio. Pista com brita, barreiras, arquibancadas e relevo. Gatilhos aceleram e freiam, LB/RB trocam marcha, Y muda a câmera e o direcional para cima mostra a telemetria.",
+      "color": "#e76f51",
+      "version": "0.2.0",
+      "url": "https://raw.githubusercontent.com/claytonaquino/console-godot/downloads/jogos/simulador-carro-0.2.0.tar.gz",
+      "sha256": "b7cb97b94d0a15111316409eba80e29b51959457b92c4168e203f1f007a0b3f9",
+      "size": 28964740
+    },
+    {
+      "id": "terra-de-blocos",
+      "title": "Terra de Blocos",
+      "description": "Ação e aventura em um mundo de blocos. Iara e Bento enfrentam máquinas gigantes: acerte os pontos fracos! Dá para jogar em dupla com dois controles.",
+      "color": "#f4a261",
+      "version": "0.1.0",
+      "url": "https://raw.githubusercontent.com/claytonaquino/console-godot/downloads/jogos/terra-de-blocos-0.1.0.tar.gz",
+      "sha256": "187306732a12be13f5fc5fe2fa7868334b6beae75e0dcb8d2e27c2189f46aa16",
+      "size": 28424185
+    }
+  ]
+}
