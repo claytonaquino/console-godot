@@ -1,0 +1,13 @@
+[Unit]
+Description=Console: escolhe o driver de video
+DefaultDependencies=no
+After=local-fs.target systemd-udev-trigger.service
+Before=systemd-user-sessions.service getty@tty1.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/console/bin/console-gpu-setup
+
+[Install]
+WantedBy=multi-user.target

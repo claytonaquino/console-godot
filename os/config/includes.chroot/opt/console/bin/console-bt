@@ -1,0 +1,61 @@
+#!/bin/bash
+# Bluetooth para o launcher. Saída em TSV: mac  nome  pareado(0/1)  conectado(0/1)
+#   list | scan [segundos] | pair MAC | connect MAC | remove MAC
+set -u
+export LC_ALL=C
+
+have_adapter() { bluetoothctl show 2>/dev/null | grep -q "Controller"; }
+
+list_devices() {
+    bluetoothctl devices 2>/dev/null | while read -r _ mac name; do
+        case "$mac" in ??:??:??:??:??:??) ;; *) continue ;; esac
+        info=$(bluetoothctl info "$mac" 2>/dev/null)
+        p=0; c=0
+        grep -q "Paired: yes" <<<"$info" && p=1
+        grep -q "Connected: yes" <<<"$info" && c=1
+        printf '%s\t%s\t%s\t%s\n' "$mac" "${name:-$mac}" "$p" "$c"
+    done | sort -t$'\t' -k4,4nr -k3,3nr
+}
+
+have_adapter || { echo "Nenhum adaptador Bluetooth encontrado."; exit 1; }
+bluetoothctl power on >/dev/null 2>&1
+
+case "${1:-}" in
+list)
+    list_devices
+    ;;
+scan)
+    bluetoothctl --timeout "${2:-10}" scan on >/dev/null 2>&1
+    list_devices
+    ;;
+pair)
+    mac=${2:?MAC}
+    out=$( {
+        echo "agent NoInputNoOutput"; echo "default-agent"
+        echo "scan on"; sleep 3
+        echo "pair $mac"; sleep 10
+        echo "trust $mac"; sleep 1
+        echo "connect $mac"; sleep 4
+        echo "scan off"; echo "quit"
+    } | bluetoothctl 2>&1 )
+    if bluetoothctl info "$mac" 2>/dev/null | grep -q "Paired: yes"; then
+        bluetoothctl trust "$mac" >/dev/null 2>&1
+        bluetoothctl connect "$mac" >/dev/null 2>&1
+        echo "Pareado"
+        exit 0
+    fi
+    echo "$out" | grep -iE "fail|error|not available" | tail -n1
+    exit 1
+    ;;
+connect)
+    bluetoothctl connect "${2:?MAC}" 2>&1 | tail -n1
+    bluetoothctl info "$2" 2>/dev/null | grep -q "Connected: yes"
+    ;;
+remove)
+    bluetoothctl remove "${2:?MAC}" 2>&1 | tail -n1
+    ;;
+*)
+    echo "uso: console-bt list|scan [s]|pair MAC|connect MAC|remove MAC" >&2
+    exit 2
+    ;;
+esac

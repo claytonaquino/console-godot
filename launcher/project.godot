@@ -1,0 +1,44 @@
+; Console Godot — launcher
+; Arquivo de configuração do projeto Godot 4.7
+
+config_version=5
+
+[application]
+
+config/name="Console Launcher"
+config/description="Menu principal do Console Godot"
+config/version="0.1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+run/low_processor_mode=false
+
+[autoload]
+
+UiTheme="*res://scripts/ui_theme.gd"
+Sys="*res://scripts/sys.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=3
+window/size/borderless=true
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+mouse_cursor/hide=false
+
+[gui]
+
+common/drop_mouse_on_gui_input_disabled=true
+
+[input_devices]
+
+joypads/ignore_joypad_on_unfocused_application=false
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=false

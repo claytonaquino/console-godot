@@ -1,0 +1,60 @@
+#!/bin/bash
+# Wi-Fi para o launcher. Saída em TSV.
+#   list                     -> em_uso  sinal  segurança  conhecida(0/1)  ssid
+#   status                   -> connected|disconnected  conexão  ip
+#   connect SSID [SENHA]
+set -u
+export LC_ALL=C
+
+has_wifi() { nmcli -t -f TYPE device 2>/dev/null | grep -qx wifi; }
+
+case "${1:-}" in
+list)
+    has_wifi || { echo "Nenhuma placa Wi-Fi encontrada."; exit 1; }
+    known=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2=="802-11-wireless"{print $1}')
+    nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID device wifi list --rescan yes 2>/dev/null |
+    while IFS=: read -r inuse signal sec ssid; do
+        ssid=${ssid//\\:/:}
+        ssid=${ssid//\\\\/\\}
+        [ -n "$ssid" ] || continue
+        k=0
+        if [ -n "$known" ] && grep -Fxq -- "$ssid" <<<"$known"; then k=1; fi
+        printf '%s\t%s\t%s\t%s\t%s\n' "$inuse" "$signal" "$sec" "$k" "$ssid"
+    done | sort -t$'\t' -k2,2nr | awk -F'\t' '!seen[$5]++'
+    ;;
+status)
+    state=$(nmcli -t -f STATE general 2>/dev/null)
+    name=$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | awk -F: '$2!="loopback"{print $1; exit}')
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    case "$state" in connected*) s=connected ;; *) s=disconnected ;; esac
+    printf '%s\t%s\t%s\n' "$s" "$name" "$ip"
+    ;;
+connect)
+    ssid=${2:?SSID}
+    pass=${3:-}
+    was_known=0
+    nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq -- "$ssid" && was_known=1
+    if [ -n "$pass" ]; then
+        out=$(nmcli device wifi connect "$ssid" password "$pass" 2>&1)
+    elif [ "$was_known" = 1 ]; then
+        out=$(nmcli connection up id "$ssid" 2>&1)
+    else
+        out=$(nmcli device wifi connect "$ssid" 2>&1)
+    fi
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        # Senha errada deixa um perfil quebrado; apaga se foi criado agora.
+        [ "$was_known" = 0 ] && nmcli connection delete id "$ssid" >/dev/null 2>&1
+        case "$out" in
+            *[Ss]ecrets*|*password*|*802-1X*) echo "Senha incorreta?" ;;
+            *) echo "$out" | tail -n1 ;;
+        esac
+        exit 1
+    fi
+    echo "Conectado a $ssid"
+    ;;
+*)
+    echo "uso: console-wifi list|status|connect SSID [SENHA]" >&2
+    exit 2
+    ;;
+esac

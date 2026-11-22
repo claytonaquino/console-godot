@@ -1,0 +1,20 @@
+#!/bin/sh
+# Informações para a tela "Informações do sistema" (TSV: chave  valor).
+export LC_ALL=C
+cpu=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//')
+mem=$(free -h | awk '/^Mem:/{print $2}')
+gpus=$(lspci 2>/dev/null | grep -E 'VGA|3D|Display' | sed 's/^[^ ]* [^:]*: //' | paste -sd ';' -)
+driver=$(cat /run/console-gpu 2>/dev/null || echo "?")
+ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+if ls /run/live/persistence 2>/dev/null | grep -q .; then
+    persist="ativa ($(df -h --output=avail "$HOME" 2>/dev/null | tail -n1 | tr -d ' ') livres)"
+else
+    persist="desativada (nada é salvo ao desligar)"
+fi
+printf 'Processador\t%s\n' "$cpu"
+printf 'Memória\t%s\n' "$mem"
+printf 'Placa (PCI)\t%s\n' "$gpus"
+printf 'Driver de vídeo\t%s\n' "$driver"
+printf 'Endereço IP\t%s\n' "${ip:--}"
+printf 'Saves no pendrive\t%s\n' "$persist"
+printf 'Sistema\tConsole Godot %s (kernel %s)\n' "$(cat /opt/console/VERSION 2>/dev/null)" "$(uname -r)"

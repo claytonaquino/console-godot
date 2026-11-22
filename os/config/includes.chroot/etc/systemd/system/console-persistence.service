@@ -1,0 +1,13 @@
+[Unit]
+Description=Console: cria a area de saves no pendrive no primeiro uso
+After=local-fs.target systemd-udev-trigger.service
+Before=getty@tty1.service
+ConditionKernelCommandLine=persistence
+
+[Service]
+Type=oneshot
+ExecStart=/opt/console/bin/console-persistence-setup
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

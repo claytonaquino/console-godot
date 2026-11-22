@@ -1,0 +1,29 @@
+#!/bin/sh
+# Ajustes finais do sistema do console.
+set -e
+
+chmod 755 /opt/console/bin/*
+find /opt/console/launcher /opt/console/games -name '*.x86_64' -exec chmod 755 {} + 2>/dev/null || true
+
+systemctl enable console-gpu.service console-persistence.service
+systemctl enable NetworkManager.service bluetooth.service
+systemctl set-default multi-user.target
+
+# Não usar nada dos discos internos do computador (nem swap)
+systemctl mask swap.target
+
+# Idioma português
+sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+locale-gen
+
+# Bluetooth liga sozinho (para os controles reconectarem)
+if [ -f /etc/bluetooth/main.conf ]; then
+	sed -i 's/^#\?AutoEnable=.*/AutoEnable=true/' /etc/bluetooth/main.conf
+fi
+
+# Logs pequenos para não encher o pendrive
+mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nSystemMaxUse=50M\n' > /etc/systemd/journald.conf.d/console.conf
+
+# Reconstrói o initramfs com a lista negra dos drivers de vídeo
+update-initramfs -u -k all

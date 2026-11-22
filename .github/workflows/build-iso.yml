@@ -1,0 +1,37 @@
+name: Gerar ISO do console
+
+on:
+  workflow_dispatch:
+    inputs:
+      sem_nvidia:
+        description: "Gerar sem o driver NVIDIA 470"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exportar launcher e jogos (Godot)
+        run: ./scripts/export-godot.sh
+
+      - name: Gerar ISO (Debian live-build em container)
+        run: |
+          if [ "${{ inputs.sem_nvidia }}" = "true" ]; then
+            ./scripts/build-iso-docker.sh --sem-nvidia
+          else
+            ./scripts/build-iso-docker.sh
+          fi
+
+      - name: Publicar a ISO numa release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="iso-$(date +%Y%m%d-%H%M)"
+          gh release create "$tag" out/*.iso --title "Console Godot $tag" --notes "ISO gerada automaticamente. Grave no pendrive com o Rufus portátil, em modo DD."

@@ -1,0 +1,25 @@
+#!/bin/sh
+# Configuração do Debian live do Console Godot (Debian 12 "bookworm").
+# Bookworm foi escolhido porque é a última versão do Debian com o driver
+# NVIDIA 470, necessário para placas Kepler como a GeForce GT 730.
+set -e
+
+lb config noauto \
+	--distribution bookworm \
+	--architectures amd64 \
+	--archive-areas "main contrib non-free non-free-firmware" \
+	--binary-images iso-hybrid \
+	--bootloaders "syslinux,grub-efi" \
+	--debian-installer none \
+	--apt-recommends false \
+	--linux-packages "linux-image linux-headers" \
+	--firmware-chroot false \
+	--firmware-binary false \
+	--security true \
+	--updates true \
+	--memtest none \
+	--iso-application "Console Godot" \
+	--iso-publisher "Console Godot" \
+	--iso-volume "CONSOLE_GODOT" \
+	--bootappend-live "boot=live components quiet splash persistence persistence-label=persistence persistence-media=removable-usb systemd.gpt_auto=0 live-config.utc=no live-config.username=console live-config.user-fullname=Console live-config.user-default-groups=audio,video,input,render,plugdev,netdev,bluetooth,sudo live-config.hostname=console live-config.locales=pt_BR.UTF-8 live-config.timezone=America/Sao_Paulo live-config.keyboard-layouts=br" \
+	"${@}"

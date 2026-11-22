@@ -1,0 +1,8 @@
+// O usuário do console pode configurar Wi-Fi e desligar/reiniciar sem senha.
+polkit.addRule(function (action, subject) {
+    if (subject.user == "console" && subject.local && subject.active &&
+        (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 ||
+         action.id.indexOf("org.freedesktop.login1.") == 0)) {
+        return polkit.Result.YES;
+    }
+});

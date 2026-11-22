@@ -1,0 +1,7 @@
+{
+  "id": "ilha-teste",
+  "title": "Ilha de Teste",
+  "description": "Explore uma ilha 3D gerada por algoritmo. Mostra o FPS na tela para medir a placa de vídeo. Y muda a qualidade, X muda a hora do dia.",
+  "exec": "ilha-teste.x86_64",
+  "color": "#2a9d8f"
+}

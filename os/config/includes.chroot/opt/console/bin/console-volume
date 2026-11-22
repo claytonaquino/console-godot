@@ -1,0 +1,14 @@
+#!/bin/sh
+# Volume da saída de som padrão (PipeWire).  get -> 0..100 | set N
+case "${1:-}" in
+get)
+    wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{printf "%d\n", $2 * 100 + 0.5}'
+    ;;
+set)
+    wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${2:?N}%" && wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+    ;;
+*)
+    echo "uso: console-volume get|set N" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Inicia o servidor gráfico só com o launcher (sem área de trabalho).
+mkdir -p "$HOME/games" "$HOME/.config/console"
+exec startx /opt/console/bin/console-xsession -- :0 vt1 -keeptty -nolisten tcp -nocursor \
+    >"$HOME/.config/console/xorg-session.log" 2>&1

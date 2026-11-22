@@ -1,0 +1,21 @@
+#!/bin/sh
+# Instala o driver NVIDIA 470 (último com suporte a placas Kepler, como a GT 730).
+# O módulo fica na lista negra e só é carregado pelo console-gpu-setup quando
+# há uma placa NVIDIA, então não atrapalha máquinas com AMD ou Intel.
+# Para gerar uma imagem sem ele: ./scripts/build-iso.sh --sem-nvidia
+set -e
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y --no-install-recommends \
+	nvidia-tesla-470-kernel-dkms nvidia-tesla-470-driver nvidia-tesla-470-vulkan-icd
+
+for kdir in /lib/modules/*; do
+	kver=$(basename "$kdir")
+	if [ -d "/usr/src/linux-headers-$kver" ]; then
+		dkms autoinstall -k "$kver" || true
+	fi
+done
+
+if ! find /lib/modules -name 'nvidia*.ko*' | grep -q .; then
+	echo "ERRO: o módulo NVIDIA 470 não foi compilado." >&2
+	exit 1
+fi

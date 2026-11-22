@@ -1,0 +1,17 @@
+#!/bin/sh
+# Sessão gráfica do console: gerenciador de janelas em tela cheia + launcher.
+# Se o launcher fechar ou travar, ele é aberto de novo.
+xset s off -dpms s noblank 2>/dev/null
+xsetroot -solid black 2>/dev/null
+matchbox-window-manager -use_titlebar no -use_cursor no &
+
+LAUNCHER=/opt/console/launcher/console-launcher.x86_64
+LOG="$HOME/.config/console/launcher.log"
+while true; do
+    # Mantém o log pequeno
+    if [ -f "$LOG" ] && [ "$(stat -c %s "$LOG")" -gt 5000000 ]; then
+        mv -f "$LOG" "$LOG.old"
+    fi
+    "$LAUNCHER" >>"$LOG" 2>&1
+    sleep 1
+done

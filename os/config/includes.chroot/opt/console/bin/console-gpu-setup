@@ -1,0 +1,43 @@
+#!/bin/sh
+# Roda como root no boot (console-gpu.service).
+# Com placa NVIDIA: tenta o driver 470 (Kepler, ex.: GT 730) e, se não der,
+# usa o nouveau. AMD e Intel usam o Mesa sem precisar de nada.
+# Preferência: ~/.config/console/gpu do usuário console ("auto" ou "nouveau")
+# ou o parâmetro de boot console.gpu=nouveau|nvidia.
+STATE=/run/console-gpu
+PREF_FILE=/home/console/.config/console/gpu
+
+rfkill unblock wifi 2>/dev/null
+rfkill unblock bluetooth 2>/dev/null
+
+pref=auto
+if [ -r "$PREF_FILE" ]; then
+    pref=$(head -n1 "$PREF_FILE" | tr -cd 'a-z')
+fi
+case " $(cat /proc/cmdline) " in
+    *" console.gpu=nouveau "*) pref=nouveau ;;
+    *" console.gpu=nvidia "*) pref=nvidia ;;
+esac
+
+if ! lspci -nd 10de: 2>/dev/null | grep -qE ' 03(00|02):'; then
+    echo mesa > "$STATE"
+    exit 0
+fi
+
+if [ "$pref" != "nouveau" ]; then
+    for m in nvidia-drm nvidia-tesla-470-drm; do
+        if modprobe "$m" modeset=1 2>/dev/null; then
+            echo nvidia-470 > "$STATE"
+            echo "console-gpu: usando driver NVIDIA 470"
+            exit 0
+        fi
+    done
+    echo "console-gpu: driver NVIDIA 470 não carregou; usando nouveau" >&2
+fi
+
+if modprobe nouveau; then
+    echo nouveau > "$STATE"
+else
+    echo generico > "$STATE"
+fi
+exit 0
