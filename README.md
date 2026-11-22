@@ -100,6 +100,34 @@ Cada jogo é uma pasta com um `game.json`, o executável Linux exportado pelo Go
 - ⏳ **A ISO ainda não foi gerada**: o ambiente onde preparei o projeto não tem acesso aos repositórios do Debian. A primeira geração será no GitHub Actions.
 - ⏳ O driver NVIDIA 470, o Wi-Fi, o Bluetooth e o som reais só podem ser confirmados no seu hardware.
 
+## Simulador de Carro (v0.1)
+
+Física própria, calculada a 240 Hz: pneu pela fórmula de Pacejka com escorregamento combinado, suspensão independente com barra estabilizadora, motor 2.0 com curva de torque, câmbio automático ou manual, diferencial autoblocante, freios com ABS e aerodinâmica.
+
+Medições do teste automático (`SIMCAR_TEST=physics`):
+
+| Teste | Resultado |
+|---|---|
+| 0–100 km/h | 8,2 s |
+| Frenagem 100–0 km/h (ABS) | 39,5 m (0,99 g) |
+| Skidpad R = 40 m | 0,93 g a 69 km/h |
+| Volta do piloto automático (pista de 1,9 km) | 1:16,6 |
+
+| Controle | Teclado | Ação |
+|---|---|---|
+| RT / LT | W / S | Acelerar / frear (parado, segurar o freio engata a ré) |
+| Analógico esquerdo | A / D | Esterçar |
+| B | Espaço | Freio de mão |
+| RB / LB | E / Q | Subir / descer marcha |
+| Y | C | Câmera (perseguição, capô, cockpit, TV) |
+| X | R | Recolocar na pista |
+| Direcional ↑ | T | Telemetria dos pneus |
+| Direcional ↓ | M | Câmbio automático / manual |
+| Direcional ← | P | Piloto automático (demonstração) |
+| Direcional → | G | Qualidade gráfica |
+| — | L | Diferencial aberto / autoblocante |
+| Select | Esc | Sair |
+
 ## Próximos passos
 
 1. Testar no XPS 8900 e anotar o FPS da Ilha de Teste em cada qualidade.
