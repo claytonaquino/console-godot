@@ -134,6 +134,25 @@ Medições do teste automático (`SIMCAR_TEST=physics`):
 | — | L | Diferencial aberto / autoblocante |
 | Select | Esc | Sair |
 
+## Terra de Blocos (v0.1 — Capítulo 1)
+
+Ação e aventura isométrica cooperativa (1 ou 2 jogadores) num mundo de blocos de brinquedo. Iara (arco) e Bento (lança) enfrentam máquinas com **pontos fracos destacáveis**: destruir uma peça muda o comportamento da máquina (sensor → fica cega, hélice → despenca, tanque → explode, canhões → expõem o núcleo do chefe).
+
+- Vila (quadro de missões, oficina de melhorias, moradores), missão 1 "O Chamado" (alavancas, portão, parede secreta com baú, artefato, emboscada) e missão 2 "Ataque à Vila" (3 ondas + chefe Colosso de Sucata com 2 fases).
+- Combo de equipe: flecha de gelo congela, golpe de lança despedaça (dano triplo).
+- Animação em "stop motion" (12 quadros/s), sons sintetizados, progresso salvo.
+- Teste automático: `TDB_TEST=bot` joga o capítulo inteiro sozinho (passou: ~7 min de jogo).
+
+| Controle | Teclado | Ação |
+|---|---|---|
+| Analógico esquerdo | WASD | Mover |
+| X (ou RT) | J | Ataque |
+| A | Espaço | Rolamento / interagir na vila |
+| Y | K | Especial (chuva de flechas / onda de choque) |
+| B | L | Habilidade (flecha de gelo / escudo) |
+| LB | Tab | Trocar herói (jogando sozinho) |
+| Start | Esc | Pausa (Jogador 2 aperta Start para entrar) |
+
 ## Próximos passos
 
 1. Testar no XPS 8900 e anotar o FPS da Ilha de Teste em cada qualidade.

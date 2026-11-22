@@ -1,0 +1,7 @@
+{
+  "id": "terra-de-blocos",
+  "title": "Terra de Blocos",
+  "description": "Ação e aventura em um mundo de blocos. Iara e Bento enfrentam máquinas gigantes: acerte os pontos fracos! Dá para jogar em dupla com dois controles.",
+  "exec": "terra-de-blocos.x86_64",
+  "color": "#f4a261"
+}
